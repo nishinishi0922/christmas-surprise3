@@ -185,27 +185,21 @@
         let puzzleImageData = null;
         let finalImageData = null;
 
-        // 画像URLを直接指定（複数の拡張子を試す）
+        // 画像URLを直接指定
         const imageIds = {
-            puzzle: 'VoumNwY',
+            puzzle: '1eL2NveQtbAKB320jRJUvd013enKco2D2',
             final: '1YA8Y90q2PkO41hsclHwbPLuEWAqgexxb'
         };
         
-        const extensions = ['jpg', 'jpeg', 'png', 'gif'];
         let puzzleImageUrl = '';
         let finalImageUrl = '';
 
         // 画像を読み込む
         async function loadImages() {
             try {
-                // パズル画像はImgur
-                puzzleImageUrl = `https://i.imgur.com/${imageIds.puzzle}.jpg`;
-                
-                // 最終画像はGoogleドライブ
-                finalImageUrl = `https://drive.google.com/uc?export=view&id=${imageIds.final}`;
-                
-                // 画像をプリロード
-                await testImageLoad(puzzleImageUrl, finalImageUrl);
+                // GoogleドライブのダイレクトダウンロードURL
+                puzzleImageUrl = `https://drive.google.com/uc?export=download&id=${imageIds.puzzle}`;
+                finalImageUrl = `https://drive.google.com/uc?export=download&id=${imageIds.final}`;
                 
                 puzzleImageData = puzzleImageUrl;
                 finalImageData = finalImageUrl;
@@ -213,33 +207,12 @@
                 createPuzzlePieces();
             } catch (error) {
                 console.error('画像読み込みエラー:', error);
-                // エラー時はImgurの拡張子を試す
-                await tryLoadImages();
+                document.getElementById('loading').textContent = '画像の読み込みに失敗しました。';
             }
         }
         
         async function tryLoadImages() {
-            for (const ext of extensions) {
-                const testPuzzleUrl = `https://i.imgur.com/${imageIds.puzzle}.${ext}`;
-                const testFinalUrl = `https://drive.google.com/uc?export=view&id=${imageIds.final}`;
-                
-                try {
-                    const success = await testImageLoad(testPuzzleUrl, testFinalUrl);
-                    if (success) {
-                        puzzleImageUrl = testPuzzleUrl;
-                        finalImageUrl = testFinalUrl;
-                        puzzleImageData = puzzleImageUrl;
-                        finalImageData = finalImageUrl;
-                        document.getElementById('loading').remove();
-                        createPuzzlePieces();
-                        return;
-                    }
-                } catch (e) {
-                    continue;
-                }
-            }
-            
-            document.getElementById('loading').textContent = '画像の読み込みに失敗しました。';
+            // この関数は不要
         }
         
         function testImageLoad(url1, url2) {

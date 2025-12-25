@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Special Surprise</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+        }
+
+        .puzzle-container {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .puzzle-title {
+            color: white;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .puzzle-hint {
+            color: rgba(255,255,255,0.9);
+            font-size: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .puzzle-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 150px);
+            grid-template-rows: repeat(3, 150px);
+            gap: 5px;
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 15px;
+            margin: 0 auto;
+            width: fit-content;
+        }
+
+        .puzzle-piece {
+            width: 150px;
+            height: 150px;
+            background-size: 450px 450px;
+            border: 2px solid white;
+            border-radius: 8px;
+            cursor: move;
+            transition: transform 0.2s, box-shadow 0.2s;
+            touch-action: none;
+            background-repeat: no-repeat;
+        }
+
+        .puzzle-piece:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .puzzle-piece.dragging {
+            opacity: 0.5;
+        }
+
+        .message-container {
+            display: none;
+            max-width: 800px;
+            padding: 3rem;
+            text-align: center;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+
+        .message-container.active {
+            display: block;
+            animation: fadeIn 1s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-text {
+            color: white;
+            font-size: 1.5rem;
+            line-height: 2;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            min-height: 300px;
+            white-space: pre-line;
+        }
+
+        .final-image {
+            opacity: 0;
+            max-width: 500px;
+            width: 100%;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            margin-top: 2rem;
+        }
+
+        .final-image.show {
+            animation: imageReveal 2s ease forwards;
+        }
+
+        @keyframes imageReveal {
+            to {
+                opacity: 1;
+                transform: scale(1.02);
+            }
+        }
+
+        .snowflake {
+            position: fixed;
+            top: -10px;
+            color: white;
+            font-size: 1.5rem;
+            pointer-events: none;
+            animation: fall linear infinite;
+            z-index: 1000;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .success-message {
+            color: white;
+            font-size: 1.2rem;
+            margin-top: 1rem;
+            opacity: 0;
+        }
+
+        .success-message.show {
+            animation: fadeIn 1s ease forwards;
+        }
+
+        .loading {
+            color: white;
+            font-size: 1rem;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="puzzle-container" id="puzzleContainer">
+        <h1 class="puzzle-title">🎄 Special Christmas Surprise 🎁</h1>
+        <p class="puzzle-hint">パズルを完成させてね💝</p>
+        <p class="loading" id="loading">画像を準備しています...</p>
+        <div class="puzzle-grid" id="puzzleGrid"></div>
+        <p class="success-message" id="successMessage">完璧！ロックが解除されました✨</p>
+    </div>
+
+    <div class="message-container" id="messageContainer">
+        <div class="message-text" id="messageText"></div>
+        <img src="" alt="Special Memory" class="final-image" id="finalImage">
+    </div>
+
+    <script>
+        const message = `Congratulations!! and Merry Christmas!!
+普段は言えていないけど、いつもありがと!
+あとたまに、辛い思いさせてしまってごめんね、、
+いつもえみりのおかげで毎日楽しくて幸せな日々をおくれてる!
+これからもよろしくね😙`;
+
+        let pieces = [];
+        let correctOrder = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+        let currentOrder = [];
+        let draggedElement = null;
+        let draggedIndex = null;
+        let puzzleImageData = null;
+        let finalImageData = null;
+
+        // 画像URLを直接指定（複数の拡張子を試す）
+        const imageIds = {
+            puzzle: 'VoumNwY',
+            final: '1YA8Y90q2PkO41hsclHwbPLuEWAqgexxb'
+        };
+        
+        const extensions = ['jpg', 'jpeg', 'png', 'gif'];
+        let puzzleImageUrl = '';
+        let finalImageUrl = '';
+
+        // 画像を読み込む
+        async function loadImages() {
+            try {
+                // パズル画像はImgur
+                puzzleImageUrl = `https://i.imgur.com/${imageIds.puzzle}.jpg`;
+                
+                // 最終画像はGoogleドライブ
+                finalImageUrl = `https://drive.google.com/uc?export=view&id=${imageIds.final}`;
+                
+                // 画像をプリロード
+                await testImageLoad(puzzleImageUrl, finalImageUrl);
+                
+                puzzleImageData = puzzleImageUrl;
+                finalImageData = finalImageUrl;
+                document.getElementById('loading').remove();
+                createPuzzlePieces();
+            } catch (error) {
+                console.error('画像読み込みエラー:', error);
+                // エラー時はImgurの拡張子を試す
+                await tryLoadImages();
+            }
+        }
+        
+        async function tryLoadImages() {
+            for (const ext of extensions) {
+                const testPuzzleUrl = `https://i.imgur.com/${imageIds.puzzle}.${ext}`;
+                const testFinalUrl = `https://drive.google.com/uc?export=view&id=${imageIds.final}`;
+                
+                try {
+                    const success = await testImageLoad(testPuzzleUrl, testFinalUrl);
+                    if (success) {
+                        puzzleImageUrl = testPuzzleUrl;
+                        finalImageUrl = testFinalUrl;
+                        puzzleImageData = puzzleImageUrl;
+                        finalImageData = finalImageUrl;
+                        document.getElementById('loading').remove();
+                        createPuzzlePieces();
+                        return;
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            
+            document.getElementById('loading').textContent = '画像の読み込みに失敗しました。';
+        }
+        
+        function testImageLoad(url1, url2) {
+            return new Promise((resolve) => {
+                const img1 = new Image();
+                const img2 = new Image();
+                
+                let loaded = 0;
+                let failed = false;
+                
+                const checkComplete = () => {
+                    loaded++;
+                    if (loaded === 2 && !failed) {
+                        resolve(true);
+                    }
+                };
+                
+                const handleError = () => {
+                    failed = true;
+                    resolve(false);
+                };
+                
+                img1.onload = checkComplete;
+                img2.onload = checkComplete;
+                img1.onerror = handleError;
+                img2.onerror = handleError;
+                
+                img1.src = url1;
+                img2.src = url2;
+                
+                // タイムアウト
+                setTimeout(() => {
+                    if (loaded < 2) {
+                        resolve(false);
+                    }
+                }, 5000);
+            });
+        }
+
+        async function tryAlternativeNames() {
+            // この関数は不要になったので削除
+        }
+
+        async function loadImageFile(filename) {
+            // この関数は不要になったので削除
+        }
+
+        function createPuzzlePieces() {
+            const grid = document.getElementById('puzzleGrid');
+            
+            // ランダムな順序を生成
+            currentOrder = [...correctOrder].sort(() => Math.random() - 0.5);
+            
+            currentOrder.forEach((pieceIndex, displayIndex) => {
+                const piece = document.createElement('div');
+                piece.className = 'puzzle-piece';
+                piece.draggable = true;
+                piece.dataset.index = displayIndex;
+                piece.dataset.correctIndex = pieceIndex;
+                
+                const row = Math.floor(pieceIndex / 3);
+                const col = pieceIndex % 3;
+                piece.style.backgroundImage = `url(${puzzleImageData})`;
+                piece.style.backgroundPosition = `-${col * 150}px -${row * 150}px`;
+                
+                piece.addEventListener('dragstart', handleDragStart);
+                piece.addEventListener('dragover', handleDragOver);
+                piece.addEventListener('drop', handleDrop);
+                piece.addEventListener('dragend', handleDragEnd);
+                
+                // タッチイベント対応
+                piece.addEventListener('touchstart', handleTouchStart, {passive: false});
+                piece.addEventListener('touchmove', handleTouchMove, {passive: false});
+                piece.addEventListener('touchend', handleTouchEnd);
+                
+                grid.appendChild(piece);
+                pieces.push(piece);
+            });
+        }
+
+        function handleDragStart(e) {
+            draggedElement = this;
+            draggedIndex = parseInt(this.dataset.index);
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            if (draggedElement !== this) {
+                const targetIndex = parseInt(this.dataset.index);
+                swapPieces(draggedIndex, targetIndex);
+            }
+            return false;
+        }
+
+        function handleDragEnd() {
+            this.classList.remove('dragging');
+        }
+
+        // タッチイベント
+        let touchTarget = null;
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            touchTarget = this;
+            draggedElement = this;
+            draggedIndex = parseInt(this.dataset.index);
+            this.classList.add('dragging');
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            if (element && element.classList.contains('puzzle-piece') && element !== touchTarget) {
+                element.style.transform = 'scale(1.1)';
+            }
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            this.classList.remove('dragging');
+            
+            if (element && element.classList.contains('puzzle-piece') && element !== touchTarget) {
+                const targetIndex = parseInt(element.dataset.index);
+                swapPieces(draggedIndex, targetIndex);
+                element.style.transform = '';
+            }
+            
+            touchTarget = null;
+        }
+
+        function swapPieces(index1, index2) {
+            const piece1 = pieces[index1];
+            const piece2 = pieces[index2];
+            
+            // データの入れ替え
+            const tempCorrectIndex = piece1.dataset.correctIndex;
+            piece1.dataset.correctIndex = piece2.dataset.correctIndex;
+            piece2.dataset.correctIndex = tempCorrectIndex;
+            
+            const tempBg = piece1.style.backgroundPosition;
+            piece1.style.backgroundPosition = piece2.style.backgroundPosition;
+            piece2.style.backgroundPosition = tempBg;
+            
+            checkCompletion();
+        }
+
+        function checkCompletion() {
+            let isComplete = true;
+            pieces.forEach((piece, index) => {
+                if (parseInt(piece.dataset.correctIndex) !== index) {
+                    isComplete = false;
+                }
+            });
+            
+            if (isComplete) {
+                completePuzzle();
+            }
+        }
+
+        function completePuzzle() {
+            createSnowflakes();
+            
+            setTimeout(() => {
+                document.getElementById('successMessage').classList.add('show');
+            }, 500);
+            
+            setTimeout(() => {
+                document.getElementById('puzzleContainer').style.display = 'none';
+                document.getElementById('messageContainer').classList.add('active');
+                typeMessage();
+            }, 2500);
+        }
+
+        function typeMessage() {
+            const messageElement = document.getElementById('messageText');
+            let index = 0;
+            
+            function type() {
+                if (index < message.length) {
+                    messageElement.textContent += message[index];
+                    index++;
+                    setTimeout(type, 80);
+                } else {
+                    showFinalImage();
+                }
+            }
+            
+            type();
+        }
+
+        function showFinalImage() {
+            const img = document.getElementById('finalImage');
+            img.src = finalImageData;
+            
+            setTimeout(() => {
+                img.classList.add('show');
+            }, 500);
+        }
+
+        function createSnowflakes() {
+            const snowflakes = ['🎄', '🎄', '🎄', '✨', '⭐', '❄️'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const snowflake = document.createElement('div');
+                    snowflake.className = 'snowflake';
+                    snowflake.textContent = snowflakes[Math.floor(Math.random() * snowflakes.length)];
+                    snowflake.style.left = Math.random() * 100 + 'vw';
+                    snowflake.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                    document.body.appendChild(snowflake);
+                    
+                    setTimeout(() => snowflake.remove(), 5000);
+                }, i * 100);
+            }
+        }
+
+        // 初期化
+        loadImages();
+    </script>
+</body>
+</html>

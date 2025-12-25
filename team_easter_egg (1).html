@@ -197,9 +197,16 @@
         // 画像を読み込む
         async function loadImages() {
             try {
-                // GoogleドライブのダイレクトダウンロードURL
-                puzzleImageUrl = `https://drive.google.com/uc?export=download&id=${imageIds.puzzle}`;
-                finalImageUrl = `https://drive.google.com/uc?export=download&id=${imageIds.final}`;
+                // Googleドライブの画像表示用URL（複数の形式を試す）
+                const formats = [
+                    `https://drive.google.com/uc?export=view&id=`,
+                    `https://drive.google.com/thumbnail?id=`,
+                    `https://lh3.googleusercontent.com/d/`
+                ];
+                
+                // とりあえず最初の形式を使用
+                puzzleImageUrl = `https://drive.google.com/uc?export=view&id=${imageIds.puzzle}`;
+                finalImageUrl = `https://drive.google.com/uc?export=view&id=${imageIds.final}`;
                 
                 puzzleImageData = puzzleImageUrl;
                 finalImageData = finalImageUrl;
@@ -207,7 +214,7 @@
                 createPuzzlePieces();
             } catch (error) {
                 console.error('画像読み込みエラー:', error);
-                document.getElementById('loading').textContent = '画像の読み込みに失敗しました。';
+                document.getElementById('loading').textContent = '画像の読み込みに失敗しました。Googleドライブの共有設定を「リンクを知っている全員」にしてください。';
             }
         }
         
